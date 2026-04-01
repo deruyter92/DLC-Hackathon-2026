@@ -1,0 +1,39 @@
+"""Helpers for locating and updating DeepLabCut PyTorch train configs."""
+
+from pathlib import Path
+from typing import Any
+
+from dlc_hackathon.schemas.benchmarking import BenchMarkTrainConfig, BenchMarkEvalConfig
+import deeplabcut.pose_estimation_pytorch as dlc_torch
+from deeplabcut.core.engine import Engine
+from deeplabcut.utils import auxiliaryfunctions
+
+
+def get_pytorch_config_path(
+    project_cfg_path: str | Path,
+    *,
+    shuffle: int,
+    trainsetindex: int,
+) -> Path:
+    """Absolute path to ``train/pytorch_config.yaml`` for a shuffle."""
+    project_cfg = dlc_torch.config.read_config_as_dict(project_cfg_path)
+    train_fraction = project_cfg["TrainingFraction"][trainsetindex]
+    rel = auxiliaryfunctions.get_model_folder(
+        train_fraction,
+        shuffle,
+        project_cfg,
+        engine=Engine.PYTORCH,
+    )
+    return Path(project_cfg_path).parent / rel / "train" / Engine.PYTORCH.pose_cfg_name
+
+
+def update_pytorch_config_file(
+    pytorch_config_path: Path | str,
+    updates: dict[str, Any] = {},
+) -> None:
+    """Merge ``updates`` into ``pytorch_config.yaml`` and write it back."""
+    if not updates:
+        return
+    cfg = dlc_torch.config.read_config_as_dict(pytorch_config_path)
+    merged = dlc_torch.config.update_config(cfg, updates)
+    dlc_torch.config.write_config(pytorch_config_path, merged)
