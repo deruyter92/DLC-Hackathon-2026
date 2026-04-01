@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project-specific: keep scripts directory, ignore its contents
+configs/*
+!configs/.gitkeep
+data/*
+!data/.gitkeep
+scripts/*
+!scripts/.gitkeep
+
+wandb/
