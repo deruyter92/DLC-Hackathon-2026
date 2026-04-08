@@ -110,13 +110,8 @@ class BBoxes(StrictBaseModel):
         return cls.model_validate_json(json_str)
 
     def dump_json(self, json_file: Path) -> None:
-        serializable = {
-            "train": _numpy_to_jsonable(self.train),
-            "test": _numpy_to_jsonable(self.test),
-        }
         Path(json_file).parent.mkdir(parents=True, exist_ok=True)
-        with open(json_file, "w") as f:
-            json.dump(serializable,f, indent=4)
+        json_file.write_text(self.model_dump_json(indent=4), encoding="utf-8")
 
     def to_images_with_context(
         self,
