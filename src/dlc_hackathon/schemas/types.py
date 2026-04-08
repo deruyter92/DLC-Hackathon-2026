@@ -36,29 +36,59 @@ DetectorContext: TypeAlias = dict[str, np.ndarray]
 ImageWithContext: TypeAlias = tuple[Path, DetectorContext]
 EvalMode: TypeAlias = Literal["train", "test"]
 ImagesWithContext: TypeAlias = list[ImageWithContext]
-
+BBboxFormat: TypeAlias = Literal["xyxy", "xywh"]
 
 class StrictBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
 
+from typing import Literal
+
+BBoxFormat = Literal["xyxy", "xywh"]
+
+
 class BBoxEntry(StrictBaseModel):
-    """Detector output for one image.
-
-    `bboxes` follow xyxy pixel coordinates: (x1, y1, x2, y2).
-    `bbox_scores` aligns one-to-one with `bboxes`.
     """
+    Detector output for one image.
 
+    `bbox_scores` aligns one-to-one with `bboxes`.
+    `bboxes` are pixel coordinates, with format given by `bbox_format`.
+    """
     bboxes: list[tuple[float, float, float, float]]
     bbox_scores: list[float]
+    bbox_format: BBoxFormat = "xyxy"
     image_path: Path | None = None
 
+    def to_array(self, *, dtype=np.float32) -> np.ndarray:
+        return np.asarray(self.bboxes, dtype=dtype).reshape(-1, 4)
+
+    def to_xywh(self, *, dtype=np.float32) -> np.ndarray:
+        boxes = self.to_array(dtype=dtype).copy()
+        if self.bbox_format == "xyxy":
+            boxes[:, 2] = boxes[:, 2] - boxes[:, 0]
+            boxes[:, 3] = boxes[:, 3] - boxes[:, 1]
+        return boxes
+
+    def to_xyxy(self, *, dtype=np.float32) -> np.ndarray:
+        boxes = self.to_array(dtype=dtype).copy()
+        if self.bbox_format == "xywh":
+            boxes[:, 2] = boxes[:, 0] + boxes[:, 2]
+            boxes[:, 3] = boxes[:, 1] + boxes[:, 3]
+        return boxes
+
     def to_detector_context(
-        self, *, dtype: np.dtype[Any] = np.float32
+        self,
+        *,
+        dtype=np.float32,
+        target_format: BBoxFormat = "xywh",
     ) -> DetectorContext:
-        """Convert this entry to DLC detector context format."""
+        if target_format == "xywh":
+            bboxes = self.to_xywh(dtype=dtype)
+        else:
+            bboxes = self.to_xyxy(dtype=dtype)
+
         return {
-            "bboxes": np.asarray(self.bboxes, dtype=dtype),
+            "bboxes": bboxes,
             "bbox_scores": np.asarray(self.bbox_scores, dtype=dtype),
         }
 
