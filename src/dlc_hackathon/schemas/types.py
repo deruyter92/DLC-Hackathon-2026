@@ -1,19 +1,18 @@
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, TypedDict
-import json
+
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 
 def _numpy_to_jsonable(obj: Any) -> Any:
-  if isinstance(obj, np.ndarray):
-      return obj.tolist()
-  if isinstance(obj, dict):
-      return {k: _numpy_to_jsonable(v) for k, v in obj.items()}
-  if isinstance(obj, list):
-      return [_numpy_to_jsonable(x) for x in obj]
-  return obj
-
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {k: _numpy_to_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_numpy_to_jsonable(x) for x in obj]
+    return obj
 
 
 class EvalMetrics(TypedDict):
@@ -24,7 +23,7 @@ class EvalMetrics(TypedDict):
 class PosePredictionEntry(TypedDict):
     keypoints: list[list[float]]
     keypoint_scores: list[list[float]]
-    image_path: Path | None = None
+    image_path: Path | None
 
 
 class PosePredictions(TypedDict):
@@ -38,11 +37,10 @@ EvalMode: TypeAlias = Literal["train", "test"]
 ImagesWithContext: TypeAlias = list[ImageWithContext]
 BBboxFormat: TypeAlias = Literal["xyxy", "xywh"]
 
+
 class StrictBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-
-from typing import Literal
 
 BBoxFormat = Literal["xyxy", "xywh"]
 
@@ -54,6 +52,7 @@ class BBoxEntry(StrictBaseModel):
     `bbox_scores` aligns one-to-one with `bboxes`.
     `bboxes` are pixel coordinates, with format given by `bbox_format`.
     """
+
     bboxes: list[tuple[float, float, float, float]]
     bbox_scores: list[float]
     bbox_format: BBoxFormat = "xyxy"
@@ -121,10 +120,8 @@ class BBoxes(StrictBaseModel):
         """Zip image paths with detector context in DLC expected format."""
         mode_bboxes = getattr(self, mode)
         if len(image_paths) != len(mode_bboxes):
-            raise ValueError(
-                f"Got {len(image_paths)} {mode} images but {len(mode_bboxes)} bbox entries."
-            )
+            raise ValueError(f"Got {len(image_paths)} {mode} images but {len(mode_bboxes)} bbox entries.")
         return [
             (image_path, bbox_entry.to_detector_context())
-            for image_path, bbox_entry in zip(image_paths, mode_bboxes)
+            for image_path, bbox_entry in zip(image_paths, mode_bboxes, strict=False)
         ]
