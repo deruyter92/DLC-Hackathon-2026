@@ -1,12 +1,14 @@
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-import numpy as np
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from dlc_hackathon.schemas.dlc_overrides import DataConfig, RunnerConfig
+
+if TYPE_CHECKING:
+    from deeplabcut.pose_estimation_pytorch.task import Task  # type: ignore
 
 
 class StrictBaseModel(BaseModel):
@@ -14,8 +16,6 @@ class StrictBaseModel(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(mode="python")
-
-
 
 
 class DataSubsetConfig(StrictBaseModel):
@@ -35,9 +35,10 @@ class ModelType(Enum):
     POSE_ESTIMATION = "pose_estimation"
 
     @property
-    def dlc_task(self) -> "Task": # type: ignore
+    def dlc_task(self) -> "Task":  # type: ignore
         """Lazy import of ``Task`` from DLC."""
         from deeplabcut.pose_estimation_pytorch.task import Task
+
         return {
             ModelType.POSE_ESTIMATION: Task.TOP_DOWN,
             ModelType.DETECTION: Task.DETECT,
@@ -59,7 +60,6 @@ class WandbLoggerConfig(StrictBaseModel):
     group: str | None = None
     tags: tuple[str] | None = None
     notes: str | None = None
-
 
     @classmethod
     def from_model_and_dataset(
@@ -85,7 +85,6 @@ class TrainSettingsConfig(StrictBaseModel):
     display_iters: int = 1000
 
 
-
 class DLCOverridesConfig(StrictBaseModel):
     data: DataConfig
     runner: RunnerConfig
@@ -98,7 +97,6 @@ class DLCOverridesConfig(StrictBaseModel):
         }
 
 
-
 class BenchMarkTrainConfig(StrictBaseModel):
     model: ModelConfig
     dataset: DataSubsetConfig
@@ -108,10 +106,10 @@ class BenchMarkTrainConfig(StrictBaseModel):
 
     @classmethod
     def from_yaml(cls, yaml_path: Path) -> "BenchMarkTrainConfig":
-        with open(yaml_path, "r") as f:
+        with open(yaml_path) as f:
             data = yaml.safe_load(f)
         return cls.model_validate(data)
-    
+
     def to_yaml(self, yaml_path: Path) -> None:
         with open(yaml_path, "w") as f:
             yaml.dump(self.to_dict(), f)
@@ -132,10 +130,10 @@ class BenchMarkEvalConfig(StrictBaseModel):
 
     @classmethod
     def from_yaml(cls, yaml_path: Path) -> "BenchMarkEvalConfig":
-        with open(yaml_path, "r") as f:
+        with open(yaml_path) as f:
             data = yaml.safe_load(f)
         return cls.model_validate(data)
-    
+
     def to_yaml(self, yaml_path: Path) -> None:
         with open(yaml_path, "w") as f:
             yaml.dump(self.to_dict(), f)

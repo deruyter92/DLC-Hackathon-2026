@@ -2,14 +2,13 @@
 
 import logging
 from pathlib import Path
-from typing import Any
 
 import deeplabcut
 import deeplabcut.pose_estimation_pytorch as dlc_torch
 from deeplabcut.core.engine import Engine
 
-from dlc_hackathon.utils import update_pytorch_config_file, get_pytorch_config_path
 from dlc_hackathon.schemas.benchmarking import BenchMarkTrainConfig, ModelType
+from dlc_hackathon.utils import get_pytorch_config_path, update_pytorch_config_file
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ def prepare_weight_init():
 
 def prepare_train_shuffle(config: BenchMarkTrainConfig) -> Path:
     """Create training shuffle(s) and update ``pytorch_config.yaml`` immediately."""
-    
+
     pytorch_config_path = get_pytorch_config_path(
         project_cfg_path=config.dataset.project_config_path,
         shuffle=config.model.shuffle,
@@ -32,17 +31,16 @@ def prepare_train_shuffle(config: BenchMarkTrainConfig) -> Path:
             config.model.shuffle,
             pytorch_config_path,
         )
-        return pytorch_config_path 
+        return pytorch_config_path
 
-    
     if config.model.type == ModelType.POSE_ESTIMATION:
-        # Create placeholder for detector type; we are only training 
+        # Create placeholder for detector type; we are only training
         # the pose estimation models
         detector_net_type = "fasterrcnn_mobilenet_v3_large_fpn"
         # pose_estimation_net_type = f"top_down_{config.model.net_type}"
         pose_estimation_net_type = config.model.net_type
     elif config.model.type == ModelType.DETECTION:
-        # Create placeholder for pose estimation net type; we are only training 
+        # Create placeholder for pose estimation net type; we are only training
         # the detection models
         pose_estimation_net_type = "top_down_resnet_50"
         detector_net_type = config.model.net_type
@@ -58,7 +56,7 @@ def prepare_train_shuffle(config: BenchMarkTrainConfig) -> Path:
         detector_type=detector_net_type,
         engine=Engine.PYTORCH,
     )
-    
+
     updates = config.overrides.to_dict() if config.overrides is not None else {}
     updates["train_settings"] = config.train_settings.to_dict()
     # For detection models, the updates are nested under the "detector" key
@@ -80,13 +78,12 @@ def get_loader(config: BenchMarkTrainConfig) -> dlc_torch.DLCLoader:
 
 def train_model(config: BenchMarkTrainConfig, device: str) -> None:
     loader = get_loader(config)
-    
+
     # The pythorch_config.yaml is the training run config for pose estimation.
     # For detection models, the run config is nested under the "detector" key.
     run_config = loader.model_cfg
     if config.model.type == ModelType.DETECTION:
         run_config = run_config["detector"]
-
 
     # fix seed for reproducibility
     dlc_torch.utils.fix_seeds(config.train_settings.seed)

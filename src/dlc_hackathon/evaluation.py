@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import deeplabcut.pose_estimation_pytorch as dlc_torch
 
 from dlc_hackathon.schemas.benchmarking import BenchMarkEvalConfig
@@ -76,14 +77,9 @@ def evaluate_pose_estimation(
         bboxes = get_ground_truth_bboxes(pose_estimation_loader)
 
     pose_estimation_snapshot = dlc_torch.apis.utils.get_model_snapshots(
-        "best",
-        pose_estimation_loader.model_folder,
-        config.pose_estimation_model.type.dlc_task
+        "best", pose_estimation_loader.model_folder, config.pose_estimation_model.type.dlc_task
     )[0]
-    runner = dlc_torch.utils.get_pose_inference_runner(
-        pose_estimation_loader.model_cfg,
-        pose_estimation_snapshot.path
-    )
+    runner = dlc_torch.utils.get_pose_inference_runner(pose_estimation_loader.model_cfg, pose_estimation_snapshot.path)
     for mode in ["train", "test"]:
         images = pose_estimation_loader.image_filenames(mode)
         mode_images_with_context = bboxes.to_images_with_context(images, mode)
@@ -92,7 +88,6 @@ def evaluate_pose_estimation(
         _ = predictions
 
     # TODO compute metrics
-    metrics = None
 
     return None
 

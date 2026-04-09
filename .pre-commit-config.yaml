@@ -1,0 +1,38 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # These are safe to run in both local & CI (they don't require "fix vs check" split)
+      - id: check-added-large-files
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: name-tests-test
+        args: [--pytest-test-first]
+
+      # These modify files. Run locally only (pre-commit stage).
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.19.0
+    hooks:
+      - id: pyproject-fmt
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.25
+    hooks:
+      - id: validate-pyproject
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.6
+    hooks:
+      # --------------------------
+      # LOCAL AUTOFIX (developers)
+      # --------------------------
+      - id: ruff-check
+        name: ruff-check (fix)
+        args: [--fix, --unsafe-fixes]
+
+      - id: ruff-format
+        name: ruff-format (write)

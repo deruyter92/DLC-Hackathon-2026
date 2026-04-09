@@ -3,7 +3,6 @@
 from pathlib import Path
 from typing import Any
 
-from dlc_hackathon.schemas.benchmarking import BenchMarkTrainConfig, BenchMarkEvalConfig
 import deeplabcut.pose_estimation_pytorch as dlc_torch
 from deeplabcut.core.engine import Engine
 from deeplabcut.utils import auxiliaryfunctions
@@ -29,9 +28,11 @@ def get_pytorch_config_path(
 
 def update_pytorch_config_file(
     pytorch_config_path: Path | str,
-    updates: dict[str, Any] = {},
+    updates: dict[str, Any] = None,
 ) -> None:
     """Merge ``updates`` into ``pytorch_config.yaml`` and write it back."""
+    if updates is None:
+        updates = {}
     if not updates:
         return
     cfg = dlc_torch.config.read_config_as_dict(pytorch_config_path)
