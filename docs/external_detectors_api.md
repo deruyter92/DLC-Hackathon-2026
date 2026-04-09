@@ -120,6 +120,11 @@ Core concepts
    - in the single-animal case, the highest-scoring detector box is used
      directly.
 
+What this does not do (yet)
+--------------------------------------
+
+- If your particular detector outputs require custom pre- or post-processing (e.g. custom score thresholding, prompts, class filtering, NMS, etc.), it is currently expected that you handle this logic within your custom detector implementation or in a wrapper around it before saving precomputed outputs. The current code does not provide built-in utilities for these common detection post-processing steps, but we are happy to help add them if there is demand during the hackathon.
+- There is no bounding box validity checking or filtering built into the dataset creation process beyond the IoU-based matching and optional GT fallback. Check for negative crops, NaNs, boxes outside the image, or other edge cases in your detector implementation or in a wrapper before saving precomputed outputs if needed.
 
 Implementing a new external detector
 ------------------------------------
