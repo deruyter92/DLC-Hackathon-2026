@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import deeplabcut.pose_estimation_pytorch as dlc_torch
 from deeplabcut.core.engine import Engine
 from deeplabcut.utils import auxiliaryfunctions
@@ -38,3 +39,16 @@ def update_pytorch_config_file(
     cfg = dlc_torch.config.read_config_as_dict(pytorch_config_path)
     merged = dlc_torch.config.update_config(cfg, updates)
     dlc_torch.config.write_config(pytorch_config_path, merged)
+
+
+def to_jsonable(data: Any) -> Any:
+    """Recursively convert nested structures with numpy values to JSON-serializable Python values."""
+    if isinstance(data, np.ndarray):
+        return data.tolist()
+    if isinstance(data, np.generic):
+        return data.item()
+    if isinstance(data, dict):
+        return {k: to_jsonable(v) for k, v in data.items()}
+    if isinstance(data, (list, tuple)):
+        return [to_jsonable(item) for item in data]
+    return data
