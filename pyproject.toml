@@ -14,10 +14,14 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "deeplabcut>=3.0.0rc14",
   "ipykernel>=7.2",
   "pydantic>=2",
   "wandb>=0.25.1",
+]
+
+[project.optional-dependencies]
+dlc-mod = [
+  "deeplabcut @ git+https://github.com/C-Achard/DeepLabCut.git@cy/h-detectors",
 ]
 
 [tool.setuptools.packages.find]
