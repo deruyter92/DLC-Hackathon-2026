@@ -3,7 +3,7 @@ build-backend = "setuptools.build_meta"
 requires = [ "setuptools>=61" ]
 
 [project]
-name = "dlc-hackaton-2026"
+name = "dlc-hackathon-2026"
 version = "0.1.0"
 description = "Organization repository for the DeepLabCut Lemanic Life Sciences Hackathon 2026"
 readme = "README.md"
