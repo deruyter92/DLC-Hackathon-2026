@@ -7,7 +7,12 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from dlc_hackathon.schemas.types import BBoxEntry, PosePredictionEntry
+from dlc_hackathon.schemas.types import (
+    BBoxEntry,
+    BBoxEvalMetrics,
+    PoseEstimationEvalMetrics,
+    PosePredictionEntry,
+)
 
 
 def plot_bbox_entry(
@@ -161,3 +166,78 @@ def plot_pose_prediction(
                 )
 
     return fig, ax
+
+
+MetricsDict = BBoxEvalMetrics | PoseEstimationEvalMetrics
+
+
+def compare_metrics(
+    runs: dict[str, MetricsDict],
+    metrics: list[str] | None = None,
+    *,
+    ax: Axes | None = None,
+    title: str = "Metric Comparison",
+) -> tuple[Figure, Axes]:
+    """Grouped bar chart comparing selected metrics across named runs.
+
+    Args:
+        runs: Mapping of run name to its metrics dict.
+        metrics: Which keys to plot. If None, plots all shared numeric keys.
+        ax: Matplotlib axes to draw on. If None, creates a new figure.
+        title: Plot title.
+
+    Returns:
+        The (figure, axes) tuple.
+    """
+    if not runs:
+        raise ValueError("At least one run is required.")
+
+    if metrics is None:
+        first = next(iter(runs.values()))
+        metrics = [k for k, v in first.items() if isinstance(v, (int, float))]
+
+    run_names = list(runs.keys())
+    x = np.arange(len(metrics))
+    width = 0.8 / len(run_names)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(max(8, len(metrics) * 1.5), 5))
+    else:
+        fig = ax.get_figure()
+
+    for i, name in enumerate(run_names):
+        values = [runs[name].get(m, 0.0) for m in metrics]
+        ax.bar(x + i * width, values, width, label=name)
+
+    ax.set_xticks(x + width * (len(run_names) - 1) / 2)
+    ax.set_xticklabels(metrics, rotation=45, ha="right")
+    ax.set_title(title)
+    ax.legend()
+    fig.tight_layout()
+    return fig, ax
+
+
+def metrics_summary_table(
+    runs: dict[str, MetricsDict],
+    metrics: list[str] | None = None,
+) -> "pd.DataFrame":
+    """Create a comparison DataFrame with runs as rows, metrics as columns.
+
+    Args:
+        runs: Mapping of run name to its metrics dict.
+        metrics: Which keys to include. If None, includes all shared numeric keys.
+
+    Returns:
+        A pandas DataFrame indexed by run name.
+    """
+    import pandas as pd
+
+    if not runs:
+        raise ValueError("At least one run is required.")
+
+    if metrics is None:
+        first = next(iter(runs.values()))
+        metrics = [k for k, v in first.items() if isinstance(v, (int, float))]
+
+    rows = {name: {m: run.get(m) for m in metrics} for name, run in runs.items()}
+    return pd.DataFrame.from_dict(rows, orient="index")
