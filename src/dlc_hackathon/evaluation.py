@@ -1,8 +1,8 @@
+import json
 from pathlib import Path
 
 import numpy as np
 from collections import defaultdict
-import deeplabcut.core.metrics as metrics
 import deeplabcut.pose_estimation_pytorch as dlc_torch
 
 from dlc_hackathon.schemas.benchmarking import BenchMarkEvalConfig
@@ -17,6 +17,7 @@ from dlc_hackathon.schemas.types import (
     PoseTrainTestMetrics,
 )
 from dlc_hackathon.metrics import calculate_bbox_metrics, calculate_pose_estimation_metrics
+from dlc_hackathon.utils import to_jsonable
 
 
 def get_ground_truth_bboxes(loader: dlc_torch.DLCLoader) -> BBoxes:
@@ -183,9 +184,28 @@ def get_predicted_poses(
     return PosePredictions(**result)
 
 
-def evaluate_detector(config: BenchMarkEvalConfig, device: str) -> tuple[BBoxes, BBoxTrainTestMetrics]:
-    """Evaluates the best trained model. Uploads results to WandB"""
+def save_metrics(
+    metrics: BBoxTrainTestMetrics | PoseTrainTestMetrics,
+    path: Path,
+) -> None:
+    """Save train/test metrics to a JSON file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(to_jsonable(metrics), indent=4), encoding="utf-8")
 
+
+def load_metrics(path: Path) -> dict:
+    """Load train/test metrics from a JSON file."""
+    if not path.exists():
+        raise FileNotFoundError(f"Metrics file not found: {path}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def evaluate_detector(
+    config: BenchMarkEvalConfig,
+    device: str,
+    save_to: Path | None = None,
+) -> tuple[BBoxes, BBoxTrainTestMetrics]:
+    """Evaluates the best trained detector model."""
     detector_loader = dlc_torch.DLCLoader(
         config=config.dataset.project_config_path,
         shuffle=config.model.shuffle,
@@ -198,18 +218,19 @@ def evaluate_detector(config: BenchMarkEvalConfig, device: str) -> tuple[BBoxes,
     test_metrics: BBoxEvalMetrics = calculate_bbox_metrics(gt_bboxes.test, bboxes.test)
     train_metrics: BBoxEvalMetrics = calculate_bbox_metrics(gt_bboxes.train, bboxes.train)
 
-    return bboxes, {
-        "test": test_metrics,
-        "train": train_metrics,
-    }
+    result: BBoxTrainTestMetrics = {"test": test_metrics, "train": train_metrics}
+    if save_to is not None:
+        save_metrics(result, save_to)
+    return bboxes, result
 
 
 def evaluate_pose_estimation(
     config: BenchMarkEvalConfig,
     bboxes: BBoxes | None = None,
     device: str = "auto",
+    save_to: Path | None = None,
 ) -> PoseTrainTestMetrics:
-    """Evaluates the pose estimation model"""
+    """Evaluates the pose estimation model."""
     pose_estimation_loader = dlc_torch.DLCLoader(
         config=config.dataset.project_config_path,
         shuffle=config.model.shuffle,
@@ -224,10 +245,11 @@ def evaluate_pose_estimation(
 
     test_metrics: PoseEstimationEvalMetrics = calculate_pose_estimation_metrics(pose_gt.test, pose_predictions.test)
     train_metrics: PoseEstimationEvalMetrics = calculate_pose_estimation_metrics(pose_gt.train, pose_predictions.train)
-    return {
-        "test": test_metrics,
-        "train": train_metrics,
-    }
+
+    result: PoseTrainTestMetrics = {"test": test_metrics, "train": train_metrics}
+    if save_to is not None:
+        save_metrics(result, save_to)
+    return result
 
 
 if __name__ == "__main__":
