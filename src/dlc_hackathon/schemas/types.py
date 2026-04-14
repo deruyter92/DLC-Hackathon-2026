@@ -15,9 +15,35 @@ def _numpy_to_jsonable(obj: Any) -> Any:
     return obj
 
 
+class BBoxEvalMetrics(TypedDict):
+    mAP_50_95: float
+    mAP_50: float
+    mAP_75: float
+    mAR_50_95: float
+    mAR_50: float
+    mAR_75: float
+    mean_iou_matched_50: float
+    num_images: int
+    num_gt_boxes: int
+    num_pred_boxes: int
+
+
+class PoseEstimationEvalMetrics(TypedDict, total=False):
+    rmse: float
+    rmse_pcutoff: float
+    mAP: float
+    mAR: float
+    rmse_detections: float
+    rmse_detections_pcutoff: float
+    keypoint_rmse: list[float]
+    keypoint_rmse_cutoff: list[float]
+    unique_keypoint_rmse: list[float]
+    unique_keypoint_rmse_cutoff: list[float]
+
+
 class EvalMetrics(TypedDict):
-    pass
-    # TODO: add metrics
+    bbox: BBoxEvalMetrics
+    pose_estimation: PoseEstimationEvalMetrics
 
 
 class PosePredictionEntry(TypedDict):
