@@ -58,10 +58,16 @@ class PosePredictionEntry(StrictBaseModel):
 
     - keypoints: shape (N, K, 2) — [x, y] per keypoint per individual.
     - keypoint_scores: shape (N, K) — confidence/visibility per keypoint.
+
+    Unique bodyparts (scene-level, always N=1) are stored as 2D:
+    - unique_keypoints: shape (K_unique, 2)
+    - unique_keypoint_scores: shape (K_unique,)
     """
 
     keypoints: list[list[list[float]]]
     keypoint_scores: list[list[float]]
+    unique_keypoints: list[list[float]] | None = None
+    unique_keypoint_scores: list[float] | None = None
     image_path: Path | None = None
 
     def to_keypoints_array(self, *, dtype=np.float32) -> np.ndarray:
@@ -77,6 +83,14 @@ class PosePredictionEntry(StrictBaseModel):
         xy = self.to_keypoints_array(dtype=dtype)
         scores = self.to_scores_array(dtype=dtype)[..., None]
         return np.concatenate([xy, scores], axis=-1)
+
+    def to_unique_pose_array(self, *, dtype=np.float32) -> np.ndarray | None:
+        """Returns shape (1, K_unique, 3) with [x, y, score], or None."""
+        if self.unique_keypoints is None:
+            return None
+        xy = np.asarray(self.unique_keypoints, dtype=dtype)
+        scores = np.asarray(self.unique_keypoint_scores, dtype=dtype)
+        return np.concatenate([xy, scores[..., None]], axis=-1)[None, ...]
 
 
 class PosePredictions(StrictBaseModel):
