@@ -2,7 +2,7 @@
 # model: PoseModelConfig or DetectorConfig (same fields; task is chosen in code by type)
 model:
   type: pose_estimation
-  name: example-pose
+  name: fish-pose-example
   net_type: top_down_rtmpose_m
   shuffle: 10
   trainsetindex: 0
@@ -15,7 +15,7 @@ dataset:
 
 logger:
   project_name: DLC-Hackathon-2026
-  run_name: example-dataset-example-pose-16
+  run_name: example-dataset-example-pose-10
   group: null
   tags: null
   notes: null
