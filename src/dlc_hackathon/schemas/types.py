@@ -97,12 +97,16 @@ class BBoxes(StrictBaseModel):
     test: list[BBoxEntry] = Field(default_factory=list)
 
     @classmethod
-    def from_file(cls, json_file: Path, missing_ok: bool = False) -> "BBoxes":
+    def from_file(cls, json_file: Path) -> "BBoxes":
         if not json_file.exists():
-            if missing_ok:
-                return cls()
             raise FileNotFoundError(f"BBoxes file not found: {json_file}")
         return cls.from_json(json_file.read_text(encoding="utf-8"))
+
+    @classmethod
+    def from_file_if_exists(cls, json_file: Path) -> "BBoxes":
+        if not json_file.exists():
+            return cls()
+        return cls.from_file(json_file)
 
     @classmethod
     def from_json(cls, json_str: str) -> "BBoxes":
