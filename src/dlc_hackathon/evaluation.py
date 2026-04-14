@@ -253,6 +253,17 @@ def evaluate_pose_estimation(
 
 
 if __name__ == "__main__":
-    config = BenchMarkEvalConfig.from_yaml(Path("configs/example_eval.yaml"))
-    pose_metrics = evaluate_pose_estimation(config, device="cuda")
-    print(pose_metrics)
+    import sys
+    from dlc_hackathon.schemas.benchmarking import ModelType
+
+    config_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("configs/example_eval_pose.yaml")
+    config = BenchMarkEvalConfig.from_yaml(config_path)
+
+    if config.model.type == ModelType.DETECTION:
+        bboxes, bbox_metrics = evaluate_detector(config, device="cuda")
+        print(bbox_metrics)
+    elif config.model.type == ModelType.POSE_ESTIMATION:
+        pose_metrics = evaluate_pose_estimation(config, device="cuda")
+        print(pose_metrics)
+    else:
+        raise ValueError(f"Unsupported model type: {config.model.type!r}")

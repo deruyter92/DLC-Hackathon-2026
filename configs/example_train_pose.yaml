@@ -15,7 +15,7 @@ dataset:
 
 logger:
   project_name: DLC-Hackathon-2026
-  run_name: example-dataset-example-pose-10
+  run_name: fish-pose-example-10
   group: null
   tags: null
   notes: null

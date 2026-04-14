@@ -7,10 +7,10 @@ dataset:
 
 
 model:
-  type: pose_estimation
-  name: fish-pose-example
-  net_type: top_down_rtmpose_m
-  shuffle: 10
+  type: detection
+  name: fish-detection-example
+  net_type: fasterrcnn_mobilenet_v3_large_fpn
+  shuffle: 11
   trainsetindex: 0
 
 eval_settings:
