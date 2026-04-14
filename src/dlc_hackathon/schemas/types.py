@@ -28,6 +28,11 @@ class BBoxEvalMetrics(TypedDict):
     num_pred_boxes: int
 
 
+class BBoxTrainTestMetrics(TypedDict):
+  train: BBoxEvalMetrics
+  test: BBoxEvalMetrics
+
+
 class PoseEstimationEvalMetrics(TypedDict, total=False):
     rmse: float
     rmse_pcutoff: float
@@ -41,9 +46,9 @@ class PoseEstimationEvalMetrics(TypedDict, total=False):
     unique_keypoint_rmse_cutoff: list[float]
 
 
-class EvalMetrics(TypedDict):
-    bbox: BBoxEvalMetrics
-    pose_estimation: PoseEstimationEvalMetrics
+class PoseTrainTestMetrics(TypedDict):
+  train: PoseEstimationEvalMetrics
+  test: PoseEstimationEvalMetrics
 
 
 class StrictBaseModel(BaseModel):

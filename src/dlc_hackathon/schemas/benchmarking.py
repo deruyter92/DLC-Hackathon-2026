@@ -123,8 +123,7 @@ class EvalSettingsConfig(StrictBaseModel):
 
 
 class BenchMarkEvalConfig(StrictBaseModel):
-    detector_model: ModelConfig
-    pose_estimation_model: ModelConfig | None = None
+    model: ModelConfig
     dataset: DataSubsetConfig
     eval_settings: EvalSettingsConfig
 
