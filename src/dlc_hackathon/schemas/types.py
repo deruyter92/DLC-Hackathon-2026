@@ -46,13 +46,40 @@ class EvalMetrics(TypedDict):
     pose_estimation: PoseEstimationEvalMetrics
 
 
-class PosePredictionEntry(TypedDict):
-    keypoints: list[list[float]]
+class StrictBaseModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+
+class PosePredictionEntry(StrictBaseModel):
+    """Per-image pose data.
+
+    Always stored in 3D format: (num_individuals, num_keypoints, ...).
+    For single-animal data, num_individuals is 1.
+
+    - keypoints: shape (N, K, 2) — [x, y] per keypoint per individual.
+    - keypoint_scores: shape (N, K) — confidence/visibility per keypoint.
+    """
+
+    keypoints: list[list[list[float]]]
     keypoint_scores: list[list[float]]
-    image_path: Path | None
+    image_path: Path | None = None
+
+    def to_keypoints_array(self, *, dtype=np.float32) -> np.ndarray:
+        """Returns shape (N, K, 2)."""
+        return np.asarray(self.keypoints, dtype=dtype)
+
+    def to_scores_array(self, *, dtype=np.float32) -> np.ndarray:
+        """Returns shape (N, K)."""
+        return np.asarray(self.keypoint_scores, dtype=dtype)
+
+    def to_pose_array(self, *, dtype=np.float32) -> np.ndarray:
+        """Returns shape (N, K, 3) with [x, y, score]."""
+        xy = self.to_keypoints_array(dtype=dtype)
+        scores = self.to_scores_array(dtype=dtype)[..., None]
+        return np.concatenate([xy, scores], axis=-1)
 
 
-class PosePredictions(TypedDict):
+class PosePredictions(StrictBaseModel):
     train: list[PosePredictionEntry]
     test: list[PosePredictionEntry]
 
@@ -61,13 +88,6 @@ DetectorContext: TypeAlias = dict[str, np.ndarray]
 ImageWithContext: TypeAlias = tuple[Path, DetectorContext]
 EvalMode: TypeAlias = Literal["train", "test"]
 ImagesWithContext: TypeAlias = list[ImageWithContext]
-BBboxFormat: TypeAlias = Literal["xyxy", "xywh"]
-
-
-class StrictBaseModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", validate_assignment=True)
-
-
 BBoxFormat = Literal["xyxy", "xywh"]
 
 

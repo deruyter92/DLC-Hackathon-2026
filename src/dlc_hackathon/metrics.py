@@ -236,45 +236,14 @@ def calculate_pose_estimation_metrics(
     if len(ground_truth_keypoints) != len(predicted_keypoints):
         raise ValueError("Ground-truth and predicted keypoint lists must have equal lengths.")
 
-    def to_pose_array(entry: PosePredictionEntry) -> np.ndarray:
-        keypoints = np.asarray(entry["keypoints"], dtype=np.float32)
-        keypoint_scores = np.asarray(entry["keypoint_scores"], dtype=np.float32)
-
-        # Accept either single-individual (K, 2) or multi-individual (N, K, 2)
-        if keypoints.ndim == 2:
-            keypoints = keypoints[None, ...]
-        if keypoints.ndim != 3 or keypoints.shape[-1] != 2:
-            raise ValueError(
-                f"Expected keypoints shape (K,2) or (N,K,2), got {keypoints.shape}."
-            )
-
-        # Accept keypoint scores as (K,), (N,K), or already expanded (N,K,1)
-        if keypoint_scores.ndim == 1:
-            keypoint_scores = keypoint_scores[None, ...]
-        elif keypoint_scores.ndim == 3 and keypoint_scores.shape[-1] == 1:
-            keypoint_scores = keypoint_scores[..., 0]
-
-        if keypoint_scores.ndim != 2:
-            raise ValueError(
-                "Expected keypoint_scores shape (K,), (N,K), or (N,K,1), "
-                f"got {keypoint_scores.shape}."
-            )
-        if keypoint_scores.shape[:2] != keypoints.shape[:2]:
-            raise ValueError(
-                "Mismatched keypoint and keypoint_scores shapes: "
-                f"{keypoints.shape} vs {keypoint_scores.shape}."
-            )
-
-        return np.concatenate([keypoints, keypoint_scores[..., None]], axis=-1)
-
     gt_dict: dict[str, np.ndarray] = {}
     pred_dict: dict[str, np.ndarray] = {}
     for idx, (gt_entry, pred_entry) in enumerate(
         zip(ground_truth_keypoints, predicted_keypoints, strict=False)
     ):
         key = str(idx)
-        gt_dict[key] = to_pose_array(gt_entry)
-        pred_dict[key] = to_pose_array(pred_entry)
+        gt_dict[key] = gt_entry.to_pose_array()
+        pred_dict[key] = pred_entry.to_pose_array()
 
     raw_metrics = dlc_compute_metrics(
         ground_truth=gt_dict,
