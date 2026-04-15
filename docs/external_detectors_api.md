@@ -30,7 +30,7 @@ This is especially useful when:
 
 Core concepts
 -------------
-1. BaseExternalDetector
+1. **BaseExternalDetector**
    External detectors implement a minimal detector API by subclassing
    BaseExternalDetector and registering themselves in EXTERNAL_DETECTORS.
 
@@ -48,8 +48,9 @@ Core concepts
 
    The detector is assumed to be inference-oriented and typically frozen.
    It does not need to implement a training loop.
+   Of course it is possible to implement a trainable detector, so feel free to extend the API as you see fit.
 
-2. Detector inference runner compatibility
+2. **Detector inference runner compatibility**
    BaseExternalDetector provides a forward() shim so it can be used by the
    existing DLC inference runner stack. This means an external detector can
    be wrapped by a standard DetectorInferenceRunner and postprocessed into
@@ -62,9 +63,9 @@ Core concepts
 
    In the top-down data path, boxes are expected in XYWH format after
    postprocessing.
-   Note that other useful fields like "classes" or "labels" are currently accepted but not deeply integrated into the rest of the code, feel free to extend if needed.
+   Note that other useful fields like "classes" or "labels" are currently accepted but not deeply integrated into the rest of the code, so feel free to extend there too.
 
-3. PrecomputedDetectorRunner
+3. **PrecomputedDetectorRunner**
    PrecomputedDetectorRunner is an adapter that makes saved bounding boxes
    behave like a detector runner. It implements:
 
@@ -72,9 +73,9 @@ Core concepts
 
    so it can be plugged directly into dataset creation or other DLC code that
    expects a detector runner. It will load from disk and emit DLC-formatted
-   detector outputs on demand.
+   detector outputs, mimicking a live detector.
 
-4. BBox schema
+4. **BBox schema**
    Precomputed detections are stored in a JSON artifact using two schema types:
 
    - BBoxEntry: detections for one image
@@ -85,10 +86,10 @@ Core concepts
    Each BBoxEntry contains:
    - bboxes
    - bbox_scores
-   - bbox_format ("xywh" or "xyxy")
+   - bbox_format ("xywh" or "xyxy" or "cxcywh", etc.)
    - optional image_path
 
-5. Bounding-box source selection
+5. **Bounding-box source selection**
    Dataset creation now owns the decision of where bounding boxes come from.
    For top-down and detection tasks, the bbox source is resolved in this order:
 
@@ -101,7 +102,7 @@ Core concepts
    top-down and detect tasks unless overridden. This preserves the previous
    behavior for projects that do not use external detectors.
 
-6. Multi-animal matching
+6. **Multi-animal matching**
    For multi-animal top-down training, detector predictions must be matched to
    annotated individuals. This implementation does that by:
 
@@ -123,8 +124,10 @@ Core concepts
 What this does not do (yet)
 --------------------------------------
 
-- If your particular detector outputs require custom pre- or post-processing (e.g. custom score thresholding, prompts, class filtering, NMS, etc.), it is currently expected that you handle this logic within your custom detector implementation or in a wrapper around it before saving precomputed outputs. The current code does not provide built-in utilities for these common detection post-processing steps, but we are happy to help add them if there is demand during the hackathon.
-- There is no bounding box validity checking or filtering built into the dataset creation process beyond the IoU-based matching and optional GT fallback. Check for negative crops, NaNs, boxes outside the image, or other edge cases in your detector implementation or in a wrapper before saving precomputed outputs if needed.
+- There is **no bounding box validity checking or filtering built into the dataset creation process** beyond the IoU-based matching and optional GT fallback. Check for negative crops, NaNs, boxes outside the image, or other edge cases in your detector implementation or in a wrapper before saving precomputed outputs if needed.
+- **Handling model configs/reproducibility signals** and other model specific details is up to you.
+- If your particular detector outputs require **custom pre- or post-processing** (e.g. custom score thresholding, prompts, class filtering, NMS, etc.), it is currently expected that you handle this logic within your custom detector implementation or in a wrapper around it before saving precomputed outputs. The current code does not provide built-in utilities for these common detection post-processing steps.
+- The **current multi-animal matching logic is based on very basic IoU** and does not consider other potential matching signals such as class labels, keypoint visibility patterns, temporal consistency, or other heuristics. This is a simple but effective strategy for many cases, but it may not be optimal for all scenarios. You may want to explore stronger strategies if relevant. This would be critical for robust performance in challenging multi-animal scenarios.
 
 Implementing a new external detector
 ------------------------------------
@@ -260,7 +263,7 @@ Only the pose model parameters are optimized.
 Config fields
 -------------
 Relevant config fields introduced by this extension:
-
+```yaml
 data:
   bbox_source: "gt" | "keypoints" | "detection_bbox" | "segmentation_mask"
   precomputed_bboxes: "/path/to/precomputed_bboxes.json"
@@ -272,8 +275,9 @@ data:
 metadata:
   external_detector:
     ... free-form detector metadata ...
+```
 
-Field meanings:
+Fields:
 - bbox_source
   Selects how bounding boxes are obtained.
 - precomputed_bboxes
@@ -290,8 +294,9 @@ Field meanings:
 - metadata.external_detector
   Optional provenance information (detector name, version, checkpoint, etc.).
 
+See these in the code for better context.
 
-Precomputed JSON format
+Precomputed bbox JSON format
 -----------------------
 Example:
 
@@ -324,10 +329,11 @@ Semantics:
 - one BBoxEntry per image,
 - each entry may contain zero, one, or many detections,
 - detector order does not need to match annotation order,
-- in multi-animal training, assignment is recovered by IoU matching.
+- in multi-animal training, assignment is recovered by IoU matching. Feel free to add better matching signals if you can !
 
+Please adapt the format and I/O if needed, but clearly document any changes and ensure the PrecomputedDetectorRunner can read your format correctly.
 
-Theoretical implementation details
+A Lot More Details That AI Seems to Care About
 ----------------------------------
 This integration treats object detection as a **separate stage** for
 top-down pose estimation.
@@ -380,7 +386,7 @@ Practical recommendations
 3. **Tune IoU threshold carefully**:
    For imperfect foundation-model boxes, a low threshold such as 0.1 may be
    appropriate; for cleaner detector outputs, a higher threshold may reduce
-   accidental mismatches.
+   accidental mismatches. ***More robust methods would be both interesting and useful here, plenty exist in the literature.***
 
 4. **Decide on fallback behavior explicitly**:
    - bbox_fallback_to_gt = true is safer and more forgiving
