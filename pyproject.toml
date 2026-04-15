@@ -3,7 +3,7 @@ build-backend = "setuptools.build_meta"
 requires = [ "setuptools>=61" ]
 
 [project]
-name = "dlc-hackaton-2026"
+name = "dlc-hackathon-2026"
 version = "0.1.0"
 description = "Organization repository for the DeepLabCut Lemanic Life Sciences Hackathon 2026"
 readme = "README.md"
@@ -14,10 +14,13 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "deeplabcut>=3.0.0rc14",
   "ipykernel>=7.2",
   "pydantic>=2",
   "wandb>=0.25.1",
+]
+[project.optional-dependencies]
+dlc-mod = [
+  "deeplabcut @ git+https://github.com/C-Achard/DeepLabCut.git@cy/h-detectors",
 ]
 
 [tool.setuptools.packages.find]

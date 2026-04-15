@@ -1,14 +1,19 @@
+import logging
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
+from dlc_hackathon.paths import REPO_ROOT
 from dlc_hackathon.schemas.dlc_overrides import DataConfig, RunnerConfig
+from dlc_hackathon.schemas.types import DETECTOR_NET_TYPES, TOP_DOWN_NET_TYPES, NetType
 
 if TYPE_CHECKING:
     from deeplabcut.pose_estimation_pytorch.task import Task  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 
 class StrictBaseModel(BaseModel):
@@ -23,6 +28,25 @@ class DataSubsetConfig(StrictBaseModel):
     root: Path
     shuffle: int
     trainsetindex: int
+
+    @model_validator(mode="after")
+    def _resolve_root(self) -> "DataSubsetConfig":
+        """Resolve relative root paths to absolute so DLC doesn't choke on them."""
+        if not self.root.is_absolute():
+            try:
+                resolved = self.root.resolve()
+                if resolved.exists():
+                    self.root = resolved
+                elif (REPO_ROOT / self.root).exists():
+                    self.root = (REPO_ROOT / self.root).resolve()
+                else:
+                    logger.warning(
+                        "Could not resolve relative root path '%s' from CWD or repo root.",
+                        self.root,
+                    )
+            except OSError:
+                logger.warning("Failed to resolve relative root path '%s'.", self.root)
+        return self
 
     @property
     def project_config_path(self) -> Path:
@@ -48,9 +72,23 @@ class ModelType(Enum):
 class ModelConfig(StrictBaseModel):
     type: ModelType
     name: str
-    net_type: str
+    net_type: NetType
     shuffle: int
     trainsetindex: int
+
+    @model_validator(mode="after")
+    def _validate_net_type_for_model_type(self) -> "ModelConfig":
+        if self.type is ModelType.DETECTION and not self.net_type.is_detector:
+            raise ValueError(
+                f"Invalid detector net_type '{self.net_type.value}'. Must be one of: {sorted(DETECTOR_NET_TYPES)}"
+            )
+
+        if self.type is ModelType.POSE_ESTIMATION and not self.net_type.is_top_down:
+            raise ValueError(
+                f"Invalid pose net_type '{self.net_type.value}'. Must be one of: {sorted(TOP_DOWN_NET_TYPES)}"
+            )
+
+        return self
 
 
 class WandbLoggerConfig(StrictBaseModel):
@@ -123,8 +161,7 @@ class EvalSettingsConfig(StrictBaseModel):
 
 
 class BenchMarkEvalConfig(StrictBaseModel):
-    detector_model: ModelConfig
-    pose_estimation_model: ModelConfig | None = None
+    model: ModelConfig
     dataset: DataSubsetConfig
     eval_settings: EvalSettingsConfig
 

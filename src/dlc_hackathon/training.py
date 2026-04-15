@@ -100,11 +100,14 @@ def train_model(config: BenchMarkTrainConfig, device: str) -> None:
 
 
 if __name__ == "__main__":
+    import sys
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(message)s",
         datefmt="%H:%M:%S",
     )
-    config = BenchMarkTrainConfig.from_yaml(Path("configs/example_benchmark.yaml"))
+    config_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("configs/example_train_pose.yaml")
+    config = BenchMarkTrainConfig.from_yaml(config_path)
     prepare_train_shuffle(config)
     train_model(config, "cuda")

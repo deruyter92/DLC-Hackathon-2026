@@ -1,0 +1,19 @@
+
+dataset:
+  name: fish-benchmark
+  root: data/fish-dlc-2021-05-07
+  shuffle: 0
+  trainsetindex: 0
+
+model:
+  type: pose_estimation
+  name: fish-pose-example
+  net_type: top_down_rtmpose_m
+  shuffle: 9
+  trainsetindex: 0
+
+eval_settings:
+  batch_size: 8
+  dataloader_workers: 8
+  dataloader_pin_memory: true
+  display_iters: 1000

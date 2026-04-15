@@ -1,29 +1,114 @@
+import json
+import logging
+from collections import defaultdict
 from pathlib import Path
 
 import deeplabcut.pose_estimation_pytorch as dlc_torch
+import numpy as np
 
+from dlc_hackathon.metrics import calculate_bbox_metrics, calculate_pose_estimation_metrics
 from dlc_hackathon.schemas.benchmarking import BenchMarkEvalConfig
 from dlc_hackathon.schemas.types import (
+    BBoxEntry,
     BBoxes,
-    EvalMetrics,
+    BBoxEvalMetrics,
+    BBoxTrainTestMetrics,
+    PoseEstimationEvalMetrics,
+    PosePredictionEntry,
+    PosePredictions,
+    PoseTrainTestMetrics,
 )
+from dlc_hackathon.utils import to_jsonable
+
+logger = logging.getLogger(__name__)
 
 
 def get_ground_truth_bboxes(loader: dlc_torch.DLCLoader) -> BBoxes:
-    raise NotImplementedError("Not implemented yet")
-    return BBoxes(train=[], test=[])
-
-
-def get_predicted_bboxes(loader: dlc_torch.DLCLoader, device: str = "auto") -> BBoxes:
-    """Gets the context for top-down pose estimation models"""
-    # If bboxes are already cached in jsonfile, return them
-    json_file = loader.evaluation_folder / "predicted_bboxes.json"
-    bboxes = BBoxes.from_file(
-        json_file,
-        missing_ok=True,
+    coco_dict = dlc_torch.DLCLoader.to_coco(
+        project_root=loader.project_path,
+        df=loader.df,
+        parameters=loader.get_dataset_parameters(),
     )
-    if bboxes and bboxes.test:
-        return bboxes
+    annotations = coco_dict["annotations"]
+    images = coco_dict["images"]
+    mode_by_fn = {fn: "train" for fn in loader.image_filenames("train")}
+    mode_by_fn.update({fn: "test" for fn in loader.image_filenames("test")})
+    anns_by_image = defaultdict(list)
+    for an in annotations:
+        anns_by_image[an["image_id"]].append(an)
+
+    bboxes_by_mode = defaultdict(list)
+    for img in images:
+        img_annotations = anns_by_image[img["id"]]
+        mode = mode_by_fn[img["file_name"]]
+        bboxes_per_img = []
+        for annotation in img_annotations:
+            bbox = annotation["bbox"]
+            if isinstance(bbox, np.ndarray):
+                bbox = bbox.tolist()
+            bboxes_per_img.append(bbox)
+        bboxes_by_mode[mode].append(
+            BBoxEntry(
+                bboxes=bboxes_per_img,
+                bbox_scores=[1.0 for _ in range(len(bboxes_per_img))],
+                bbox_format="xywh",
+                image_path=Path(img["file_name"]),
+            )
+        )
+    return BBoxes(**bboxes_by_mode)
+
+
+def get_ground_truth_poses(loader: dlc_torch.DLCLoader) -> PosePredictions:
+    """Get ground-truth keypoints from a DLCLoader as PosePredictions."""
+    has_unique = len(loader.model_cfg["metadata"]["unique_bodyparts"]) >= 1
+
+    result: dict[str, list[PosePredictionEntry]] = {}
+    for mode in ("train", "test"):
+        gt_dict = loader.ground_truth_keypoints(mode)
+        gt_unique_dict = loader.ground_truth_keypoints(mode, unique_bodypart=True) if has_unique else {}
+
+        entries: list[PosePredictionEntry] = []
+        for image_path, keypoints_array in gt_dict.items():
+            if keypoints_array.ndim == 2:
+                keypoints_array = keypoints_array[None, ...]
+            xy = keypoints_array[..., :2].tolist()
+            visibility = keypoints_array[..., 2].tolist()
+
+            unique_xy = None
+            unique_scores = None
+            if image_path in gt_unique_dict:
+                ukps = gt_unique_dict[image_path]
+                if ukps.ndim == 3:
+                    ukps = ukps[0]
+                unique_xy = ukps[..., :2].tolist()
+                unique_scores = ukps[..., 2].tolist()
+
+            entries.append(
+                PosePredictionEntry(
+                    keypoints=xy,
+                    keypoint_scores=visibility,
+                    unique_keypoints=unique_xy,
+                    unique_keypoint_scores=unique_scores,
+                    image_path=Path(image_path),
+                )
+            )
+        result[mode] = entries
+    return PosePredictions(**result)
+
+
+def get_predicted_bboxes(
+    loader: dlc_torch.DLCLoader,
+    device: str = "auto",
+    use_cache: bool = True,
+) -> BBoxes:
+    """Gets the context for top-down pose estimation models."""
+    json_file = loader.evaluation_folder / "predicted_bboxes.json"
+    if use_cache:
+        bboxes = BBoxes.from_file_if_exists(json_file)
+        if bboxes and bboxes.test:
+            logger.info("Loaded predicted bboxes from cache: %s", json_file)
+            return bboxes
+        logger.debug("No cached bboxes found, running inference.")
 
     det_snapshot = dlc_torch.apis.utils.get_model_snapshots(
         "best",
@@ -32,72 +117,168 @@ def get_predicted_bboxes(loader: dlc_torch.DLCLoader, device: str = "auto") -> B
     )[0]
 
     runner = dlc_torch.apis.utils.get_detector_inference_runner(loader.model_cfg, det_snapshot.path, device=device)
-    bboxes = BBoxes(train=[], test=[])
-    bboxes.test = runner.inference(loader.image_filenames("test"))
-    bboxes.dump_json(json_file)
-    bboxes.train = runner.inference(loader.image_filenames("train"))
+    bboxes_by_mode = {}
+    for mode in ["train", "test"]:
+        filenames = loader.image_filenames(mode)
+        predictions = runner.inference(filenames)
+        bboxes_by_mode[mode] = [
+            BBoxEntry(
+                bboxes=pred["bboxes"].tolist(),
+                bbox_scores=pred["bbox_scores"].tolist(),
+                bbox_format="xywh",
+                image_path=Path(fn),
+            )
+            for fn, pred in zip(filenames, predictions, strict=False)
+        ]
+    bboxes = BBoxes(**bboxes_by_mode)
     bboxes.dump_json(json_file)
     return bboxes
 
 
-def evaluate_detector(config: BenchMarkEvalConfig, device: str) -> tuple[BBoxes, EvalMetrics]:
-    """Evaluates the best trained model. Uploads results to WandB"""
+def get_predicted_poses(
+    loader: dlc_torch.DLCLoader,
+    bboxes: BBoxes | None = None,
+    device: str = "auto",
+) -> PosePredictions:
+    """Run pose inference and return predictions as PosePredictions."""
+    if loader.pose_task == dlc_torch.Task.TOP_DOWN and bboxes is None:
+        raise ValueError("Bboxes are required for top-down pose estimation")
 
-    detector_loader = dlc_torch.DLCLoader(
-        config=config.dataset.project_config_path,
-        shuffle=config.detector_model.shuffle,
-        trainset_index=config.detector_model.trainsetindex,
+    snapshot = dlc_torch.apis.utils.get_model_snapshots(
+        "best",
+        loader.model_folder,
+        loader.pose_task,
+    )[0]
+    runner = dlc_torch.apis.utils.get_pose_inference_runner(
+        loader.model_cfg,
+        snapshot.path,
+        device=device,
     )
 
-    bboxes = get_predicted_bboxes(detector_loader, device)
+    has_unique = len(loader.model_cfg["metadata"]["unique_bodyparts"]) >= 1
 
-    # TODO: compute metrics
-    # metrics = compute_metrics(...)
-    metrics = None
+    result: dict[str, list[PosePredictionEntry]] = {}
+    for mode in ("train", "test"):
+        filenames = loader.image_filenames(mode)
+        if bboxes is not None:
+            # Top-down pose estimation using bboxes
+            images_with_ctx = bboxes.to_images_with_context(filenames, mode)
+            raw_predictions = runner.inference(images=images_with_ctx)
+        else:
+            # Bottom-up pose estimation
+            raw_predictions = runner.inference(filenames)
 
-    return bboxes, metrics
+        entries: list[PosePredictionEntry] = []
+        for fn, pred in zip(filenames, raw_predictions, strict=False):
+            kps = pred["bodyparts"]
+            if kps.ndim == 2:
+                kps = kps[None, ...]
+
+            unique_xy = None
+            unique_scores = None
+            if has_unique and "unique_bodyparts" in pred:
+                ukps = pred["unique_bodyparts"]
+                if ukps.ndim == 3:
+                    ukps = ukps[0]
+                unique_xy = ukps[..., :2].tolist()
+                unique_scores = ukps[..., 2].tolist()
+
+            entries.append(
+                PosePredictionEntry(
+                    keypoints=kps[..., :2].tolist(),
+                    keypoint_scores=kps[..., 2].tolist(),
+                    unique_keypoints=unique_xy,
+                    unique_keypoint_scores=unique_scores,
+                    image_path=Path(fn),
+                )
+            )
+        result[mode] = entries
+
+    return PosePredictions(**result)
+
+
+def save_metrics(
+    metrics: BBoxTrainTestMetrics | PoseTrainTestMetrics,
+    path: Path,
+) -> None:
+    """Save train/test metrics to a JSON file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(to_jsonable(metrics), indent=4), encoding="utf-8")
+
+
+def load_metrics(path: Path) -> dict:
+    """Load train/test metrics from a JSON file."""
+    if not path.exists():
+        raise FileNotFoundError(f"Metrics file not found: {path}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def evaluate_detector(
+    config: BenchMarkEvalConfig,
+    device: str,
+    save_to: Path | None = None,
+    use_cache: bool = True,
+) -> tuple[BBoxes, BBoxTrainTestMetrics]:
+    """Evaluates the best trained detector model."""
+    detector_loader = dlc_torch.DLCLoader(
+        config=config.dataset.project_config_path,
+        shuffle=config.model.shuffle,
+        trainset_index=config.model.trainsetindex,
+    )
+
+    bboxes: BBoxes = get_predicted_bboxes(detector_loader, device, use_cache=use_cache)
+    gt_bboxes: BBoxes = get_ground_truth_bboxes(detector_loader)
+
+    test_metrics: BBoxEvalMetrics = calculate_bbox_metrics(gt_bboxes.test, bboxes.test)
+    train_metrics: BBoxEvalMetrics = calculate_bbox_metrics(gt_bboxes.train, bboxes.train)
+
+    result: BBoxTrainTestMetrics = {"test": test_metrics, "train": train_metrics}
+    if save_to is not None:
+        save_metrics(result, save_to)
+    return bboxes, result
 
 
 def evaluate_pose_estimation(
     config: BenchMarkEvalConfig,
     bboxes: BBoxes | None = None,
     device: str = "auto",
-) -> None:
-    """Evaluates the pose estimation model"""
-    if config.pose_estimation_model is None:
-        raise ValueError("Pose estimation model is not set")
-
+    save_to: Path | None = None,
+) -> PoseTrainTestMetrics:
+    """Evaluates the pose estimation model."""
     pose_estimation_loader = dlc_torch.DLCLoader(
         config=config.dataset.project_config_path,
-        shuffle=config.pose_estimation_model.shuffle,
-        trainset_index=config.pose_estimation_model.trainsetindex,
+        shuffle=config.model.shuffle,
+        trainset_index=config.model.trainsetindex,
     )
 
-    if bboxes is None:
+    if bboxes is None and pose_estimation_loader.pose_task == dlc_torch.Task.TOP_DOWN:
         bboxes = get_ground_truth_bboxes(pose_estimation_loader)
 
-    pose_estimation_snapshot = dlc_torch.apis.utils.get_model_snapshots(
-        "best", pose_estimation_loader.model_folder, config.pose_estimation_model.type.dlc_task
-    )[0]
-    runner = dlc_torch.utils.get_pose_inference_runner(pose_estimation_loader.model_cfg, pose_estimation_snapshot.path)
-    for mode in ["train", "test"]:
-        images = pose_estimation_loader.image_filenames(mode)
-        mode_images_with_context = bboxes.to_images_with_context(images, mode)
-        predictions = runner.inference(images=mode_images_with_context)
-        # TODO: collect and score predictions
-        _ = predictions
+    pose_predictions: PosePredictions = get_predicted_poses(pose_estimation_loader, bboxes, device)
+    pose_gt: PosePredictions = get_ground_truth_poses(pose_estimation_loader)
 
-    # TODO compute metrics
+    test_metrics: PoseEstimationEvalMetrics = calculate_pose_estimation_metrics(pose_gt.test, pose_predictions.test)
+    train_metrics: PoseEstimationEvalMetrics = calculate_pose_estimation_metrics(pose_gt.train, pose_predictions.train)
 
-    return None
-
-
-def evaluate(config: BenchMarkEvalConfig, device: str = "auto") -> None:
-    bboxes, _ = evaluate_detector(config, device=device)
-    if config.pose_estimation_model is not None:
-        evaluate_pose_estimation(config, bboxes=bboxes, device=device)
+    result: PoseTrainTestMetrics = {"test": test_metrics, "train": train_metrics}
+    if save_to is not None:
+        save_metrics(result, save_to)
+    return result
 
 
 if __name__ == "__main__":
-    config = BenchMarkEvalConfig.from_yaml(Path("configs/example_eval.yaml"))
-    evaluate(config, device="cuda")
+    import sys
+
+    from dlc_hackathon.schemas.benchmarking import ModelType
+
+    config_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("configs/example_eval_pose.yaml")
+    config = BenchMarkEvalConfig.from_yaml(config_path)
+
+    if config.model.type == ModelType.DETECTION:
+        bboxes, bbox_metrics = evaluate_detector(config, device="cuda")
+        print(bbox_metrics)
+    elif config.model.type == ModelType.POSE_ESTIMATION:
+        pose_metrics = evaluate_pose_estimation(config, device="cuda")
+        print(pose_metrics)
+    else:
+        raise ValueError(f"Unsupported model type: {config.model.type!r}")

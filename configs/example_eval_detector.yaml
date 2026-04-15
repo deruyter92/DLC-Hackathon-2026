@@ -1,23 +1,17 @@
 
 dataset:
   name: fish-benchmark
-  root: data/rc14_bench_fish-dlc-2026-03-10
+  root: data/fish-dlc-2021-05-07
   shuffle: 0
   trainsetindex: 0
 
-detector_model:
-  type: detection
-  name: fish-detector-frcnn
-  net_type: fasterrcnn_mobilenet_v3_large_fpn
-  shuffle: 16
-  trainsetindex: 0
 
-pose_estimation_model: null
-  # type: pose_estimation
-  # name: fish-pose-resnet
-  # net_type: resnet_50
-  # shuffle: 12
-  # trainsetindex: 0
+model:
+  type: detection
+  name: fish-detection-example
+  net_type: fasterrcnn_mobilenet_v3_large_fpn
+  shuffle: 8
+  trainsetindex: 0
 
 eval_settings:
   batch_size: 8
