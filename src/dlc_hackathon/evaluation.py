@@ -1,26 +1,26 @@
 import json
 import logging
+from collections import defaultdict
 from pathlib import Path
 
-import numpy as np
-from collections import defaultdict
 import deeplabcut.pose_estimation_pytorch as dlc_torch
+import numpy as np
 
-logger = logging.getLogger(__name__)
-
+from dlc_hackathon.metrics import calculate_bbox_metrics, calculate_pose_estimation_metrics
 from dlc_hackathon.schemas.benchmarking import BenchMarkEvalConfig
 from dlc_hackathon.schemas.types import (
     BBoxEntry,
     BBoxes,
+    BBoxEvalMetrics,
+    BBoxTrainTestMetrics,
+    PoseEstimationEvalMetrics,
     PosePredictionEntry,
     PosePredictions,
-    BBoxEvalMetrics,
-    PoseEstimationEvalMetrics,
-    BBoxTrainTestMetrics,
     PoseTrainTestMetrics,
 )
-from dlc_hackathon.metrics import calculate_bbox_metrics, calculate_pose_estimation_metrics
 from dlc_hackathon.utils import to_jsonable
+
+logger = logging.getLogger(__name__)
 
 
 def get_ground_truth_bboxes(loader: dlc_torch.DLCLoader) -> BBoxes:
@@ -29,14 +29,14 @@ def get_ground_truth_bboxes(loader: dlc_torch.DLCLoader) -> BBoxes:
         df=loader.df,
         parameters=loader.get_dataset_parameters(),
     )
-    annotations = coco_dict['annotations']
-    images = coco_dict['images']
+    annotations = coco_dict["annotations"]
+    images = coco_dict["images"]
     mode_by_fn = {fn: "train" for fn in loader.image_filenames("train")}
     mode_by_fn.update({fn: "test" for fn in loader.image_filenames("test")})
     anns_by_image = defaultdict(list)
     for an in annotations:
         anns_by_image[an["image_id"]].append(an)
-    
+
     bboxes_by_mode = defaultdict(list)
     for img in images:
         img_annotations = anns_by_image[img["id"]]
@@ -47,12 +47,14 @@ def get_ground_truth_bboxes(loader: dlc_torch.DLCLoader) -> BBoxes:
             if isinstance(bbox, np.ndarray):
                 bbox = bbox.tolist()
             bboxes_per_img.append(bbox)
-        bboxes_by_mode[mode].append(BBoxEntry(
-            bboxes=bboxes_per_img,
-            bbox_scores=[1.0 for _ in range(len(bboxes_per_img))],
-            bbox_format="xywh",
-            image_path=Path(img["file_name"]),
-        ))
+        bboxes_by_mode[mode].append(
+            BBoxEntry(
+                bboxes=bboxes_per_img,
+                bbox_scores=[1.0 for _ in range(len(bboxes_per_img))],
+                bbox_format="xywh",
+                image_path=Path(img["file_name"]),
+            )
+        )
     return BBoxes(**bboxes_by_mode)
 
 
@@ -63,11 +65,7 @@ def get_ground_truth_poses(loader: dlc_torch.DLCLoader) -> PosePredictions:
     result: dict[str, list[PosePredictionEntry]] = {}
     for mode in ("train", "test"):
         gt_dict = loader.ground_truth_keypoints(mode)
-        gt_unique_dict = (
-            loader.ground_truth_keypoints(mode, unique_bodypart=True)
-            if has_unique
-            else {}
-        )
+        gt_unique_dict = loader.ground_truth_keypoints(mode, unique_bodypart=True) if has_unique else {}
 
         entries: list[PosePredictionEntry] = []
         for image_path, keypoints_array in gt_dict.items():
@@ -85,13 +83,15 @@ def get_ground_truth_poses(loader: dlc_torch.DLCLoader) -> PosePredictions:
                 unique_xy = ukps[..., :2].tolist()
                 unique_scores = ukps[..., 2].tolist()
 
-            entries.append(PosePredictionEntry(
-                keypoints=xy,
-                keypoint_scores=visibility,
-                unique_keypoints=unique_xy,
-                unique_keypoint_scores=unique_scores,
-                image_path=Path(image_path),
-            ))
+            entries.append(
+                PosePredictionEntry(
+                    keypoints=xy,
+                    keypoint_scores=visibility,
+                    unique_keypoints=unique_xy,
+                    unique_keypoint_scores=unique_scores,
+                    image_path=Path(image_path),
+                )
+            )
         result[mode] = entries
     return PosePredictions(**result)
 
@@ -123,12 +123,12 @@ def get_predicted_bboxes(
         predictions = runner.inference(filenames)
         bboxes_by_mode[mode] = [
             BBoxEntry(
-                bboxes=pred['bboxes'].tolist(),
-                bbox_scores=pred['bbox_scores'].tolist(),
+                bboxes=pred["bboxes"].tolist(),
+                bbox_scores=pred["bbox_scores"].tolist(),
                 bbox_format="xywh",
                 image_path=Path(fn),
             )
-            for fn, pred in zip(filenames, predictions)
+            for fn, pred in zip(filenames, predictions, strict=False)
         ]
     bboxes = BBoxes(**bboxes_by_mode)
     bboxes.dump_json(json_file)
@@ -145,11 +145,13 @@ def get_predicted_poses(
         raise ValueError("Bboxes are required for top-down pose estimation")
 
     snapshot = dlc_torch.apis.utils.get_model_snapshots(
-        "best", loader.model_folder, loader.pose_task,
+        "best",
+        loader.model_folder,
+        loader.pose_task,
     )[0]
     runner = dlc_torch.apis.utils.get_pose_inference_runner(
         loader.model_cfg,
-        snapshot.path, 
+        snapshot.path,
         device=device,
     )
 
@@ -167,7 +169,7 @@ def get_predicted_poses(
             raw_predictions = runner.inference(filenames)
 
         entries: list[PosePredictionEntry] = []
-        for fn, pred in zip(filenames, raw_predictions):
+        for fn, pred in zip(filenames, raw_predictions, strict=False):
             kps = pred["bodyparts"]
             if kps.ndim == 2:
                 kps = kps[None, ...]
@@ -181,13 +183,15 @@ def get_predicted_poses(
                 unique_xy = ukps[..., :2].tolist()
                 unique_scores = ukps[..., 2].tolist()
 
-            entries.append(PosePredictionEntry(
-                keypoints=kps[..., :2].tolist(),
-                keypoint_scores=kps[..., 2].tolist(),
-                unique_keypoints=unique_xy,
-                unique_keypoint_scores=unique_scores,
-                image_path=Path(fn),
-            ))
+            entries.append(
+                PosePredictionEntry(
+                    keypoints=kps[..., :2].tolist(),
+                    keypoint_scores=kps[..., 2].tolist(),
+                    unique_keypoints=unique_xy,
+                    unique_keypoint_scores=unique_scores,
+                    image_path=Path(fn),
+                )
+            )
         result[mode] = entries
 
     return PosePredictions(**result)
@@ -264,6 +268,7 @@ def evaluate_pose_estimation(
 
 if __name__ == "__main__":
     import sys
+
     from dlc_hackathon.schemas.benchmarking import ModelType
 
     config_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("configs/example_eval_pose.yaml")

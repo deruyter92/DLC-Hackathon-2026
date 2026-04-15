@@ -18,7 +18,6 @@ dependencies = [
   "pydantic>=2",
   "wandb>=0.25.1",
 ]
-
 [project.optional-dependencies]
 dlc-mod = [
   "deeplabcut @ git+https://github.com/C-Achard/DeepLabCut.git@cy/h-detectors",

@@ -141,16 +141,12 @@ def _align_image_pairs(
             missing_pred = sorted(set(gt_map) - set(pr_map))
             missing_gt = sorted(set(pr_map) - set(gt_map))
             raise ValueError(
-                "GT/pred image keys do not match. "
-                f"Missing in predictions: {missing_pred}. Missing in GT: {missing_gt}."
+                f"GT/pred image keys do not match. Missing in predictions: {missing_pred}. Missing in GT: {missing_gt}."
             )
         return [_ImagePair(gt=gt_map[k], pred=pr_map[k]) for k in sorted(gt_map)]
 
     if len(ground_truth_bboxes) != len(predicted_bboxes):
-        raise ValueError(
-            "When image_path is missing, GT and predictions must have equal lengths "
-            "to align by index."
-        )
+        raise ValueError("When image_path is missing, GT and predictions must have equal lengths to align by index.")
     return [_ImagePair(gt=g, pred=p) for g, p in zip(ground_truth_bboxes, predicted_bboxes, strict=False)]
 
 
@@ -238,9 +234,7 @@ def calculate_pose_estimation_metrics(
 
     gt_dict: dict[str, np.ndarray] = {}
     pred_dict: dict[str, np.ndarray] = {}
-    for idx, (gt_entry, pred_entry) in enumerate(
-        zip(ground_truth_keypoints, predicted_keypoints, strict=False)
-    ):
+    for idx, (gt_entry, pred_entry) in enumerate(zip(ground_truth_keypoints, predicted_keypoints, strict=False)):
         key = str(idx)
         gt_dict[key] = gt_entry.to_pose_array()
         pred_dict[key] = pred_entry.to_pose_array()

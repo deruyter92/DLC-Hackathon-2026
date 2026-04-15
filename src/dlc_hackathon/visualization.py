@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,6 +13,9 @@ from dlc_hackathon.schemas.types import (
     PoseEstimationEvalMetrics,
     PosePredictionEntry,
 )
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def plot_bbox_entry(
@@ -143,7 +146,7 @@ def plot_pose_prediction(
     ax.scatter(xs, ys, c=color, marker=marker, s=marker_size**2, zorder=3, label=label)
 
     if show_scores:
-        for x, y, s in zip(xs, ys, scores[visible]):
+        for x, y, s in zip(xs, ys, scores[visible], strict=False):
             ax.text(
                 x + 2,
                 y - 2,
@@ -220,7 +223,7 @@ def compare_metrics(
 def metrics_summary_table(
     runs: dict[str, MetricsDict],
     metrics: list[str] | None = None,
-) -> "pd.DataFrame":
+) -> pd.DataFrame:
     """Create a comparison DataFrame with runs as rows, metrics as columns.
 
     Args:

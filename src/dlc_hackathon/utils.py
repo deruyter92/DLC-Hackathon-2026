@@ -3,8 +3,8 @@
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import deeplabcut.pose_estimation_pytorch as dlc_torch
+import numpy as np
 from deeplabcut.core.engine import Engine
 from deeplabcut.utils import auxiliaryfunctions
 

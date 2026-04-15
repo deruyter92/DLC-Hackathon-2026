@@ -81,8 +81,8 @@ class BBoxEvalMetrics(TypedDict):
 
 
 class BBoxTrainTestMetrics(TypedDict):
-  train: BBoxEvalMetrics
-  test: BBoxEvalMetrics
+    train: BBoxEvalMetrics
+    test: BBoxEvalMetrics
 
 
 class PoseEstimationEvalMetrics(TypedDict, total=False):
@@ -99,8 +99,8 @@ class PoseEstimationEvalMetrics(TypedDict, total=False):
 
 
 class PoseTrainTestMetrics(TypedDict):
-  train: PoseEstimationEvalMetrics
-  test: PoseEstimationEvalMetrics
+    train: PoseEstimationEvalMetrics
+    test: PoseEstimationEvalMetrics
 
 
 class StrictBaseModel(BaseModel):

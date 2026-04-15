@@ -1,7 +1,7 @@
+import logging
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
-import logging
 
 import yaml
 from pydantic import BaseModel, ConfigDict, model_validator
