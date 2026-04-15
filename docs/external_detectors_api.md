@@ -386,7 +386,7 @@ Practical recommendations
 3. **Tune IoU threshold carefully**:
    For imperfect foundation-model boxes, a low threshold such as 0.1 may be
    appropriate; for cleaner detector outputs, a higher threshold may reduce
-   accidental mismatches. More robust methods would be both interesting and useful here, plenty exist in the literature.
+   accidental mismatches. ***More robust methods would be both interesting and useful here, plenty exist in the literature.***
 
 4. **Decide on fallback behavior explicitly**:
    - bbox_fallback_to_gt = true is safer and more forgiving
