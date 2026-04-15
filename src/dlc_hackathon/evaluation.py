@@ -1,9 +1,12 @@
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
 from collections import defaultdict
 import deeplabcut.pose_estimation_pytorch as dlc_torch
+
+logger = logging.getLogger(__name__)
 
 from dlc_hackathon.schemas.benchmarking import BenchMarkEvalConfig
 from dlc_hackathon.schemas.types import (
@@ -93,13 +96,19 @@ def get_ground_truth_poses(loader: dlc_torch.DLCLoader) -> PosePredictions:
     return PosePredictions(**result)
 
 
-def get_predicted_bboxes(loader: dlc_torch.DLCLoader, device: str = "auto") -> BBoxes:
-    """Gets the context for top-down pose estimation models"""
-    # If bboxes are already cached in jsonfile, return them
+def get_predicted_bboxes(
+    loader: dlc_torch.DLCLoader,
+    device: str = "auto",
+    use_cache: bool = True,
+) -> BBoxes:
+    """Gets the context for top-down pose estimation models."""
     json_file = loader.evaluation_folder / "predicted_bboxes.json"
-    bboxes = BBoxes.from_file_if_exists(json_file)
-    if bboxes and bboxes.test:
-        return bboxes
+    if use_cache:
+        bboxes = BBoxes.from_file_if_exists(json_file)
+        if bboxes and bboxes.test:
+            logger.info("Loaded predicted bboxes from cache: %s", json_file)
+            return bboxes
+        logger.debug("No cached bboxes found, running inference.")
 
     det_snapshot = dlc_torch.apis.utils.get_model_snapshots(
         "best",
@@ -204,6 +213,7 @@ def evaluate_detector(
     config: BenchMarkEvalConfig,
     device: str,
     save_to: Path | None = None,
+    use_cache: bool = True,
 ) -> tuple[BBoxes, BBoxTrainTestMetrics]:
     """Evaluates the best trained detector model."""
     detector_loader = dlc_torch.DLCLoader(
@@ -212,7 +222,7 @@ def evaluate_detector(
         trainset_index=config.model.trainsetindex,
     )
 
-    bboxes: BBoxes = get_predicted_bboxes(detector_loader, device)
+    bboxes: BBoxes = get_predicted_bboxes(detector_loader, device, use_cache=use_cache)
     gt_bboxes: BBoxes = get_ground_truth_bboxes(detector_loader)
 
     test_metrics: BBoxEvalMetrics = calculate_bbox_metrics(gt_bboxes.test, bboxes.test)
