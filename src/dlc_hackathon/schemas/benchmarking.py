@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from dlc_hackathon.paths import REPO_ROOT
 from dlc_hackathon.schemas.dlc_overrides import DataConfig, RunnerConfig
+from dlc_hackathon.schemas.types import DETECTOR_NET_TYPES, TOP_DOWN_NET_TYPES, NetType
 
 if TYPE_CHECKING:
     from deeplabcut.pose_estimation_pytorch.task import Task  # type: ignore
@@ -71,9 +72,23 @@ class ModelType(Enum):
 class ModelConfig(StrictBaseModel):
     type: ModelType
     name: str
-    net_type: str
+    net_type: NetType
     shuffle: int
     trainsetindex: int
+
+    @model_validator(mode="after")
+    def _validate_net_type_for_model_type(self) -> "ModelConfig":
+        if self.type is ModelType.DETECTION and not self.net_type.is_detector:
+            raise ValueError(
+                f"Invalid detector net_type '{self.net_type.value}'. Must be one of: {sorted(DETECTOR_NET_TYPES)}"
+            )
+
+        if self.type is ModelType.POSE_ESTIMATION and not self.net_type.is_top_down:
+            raise ValueError(
+                f"Invalid pose net_type '{self.net_type.value}'. Must be one of: {sorted(TOP_DOWN_NET_TYPES)}"
+            )
+
+        return self
 
 
 class WandbLoggerConfig(StrictBaseModel):

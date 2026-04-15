@@ -1,8 +1,60 @@
+from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, TypedDict
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class NetType(str, Enum):
+    # Detector net types (DeepLabCut cy/h-detectors)
+    FASTERRCNN_MOBILENET_V3_LARGE_FPN = "fasterrcnn_mobilenet_v3_large_fpn"
+    FASTERRCNN_RESNET50_FPN_V2 = "fasterrcnn_resnet50_fpn_v2"
+    SSDLITE = "ssdlite"
+
+    # Top-down net types (DeepLabCut cy/h-detectors)
+    ANIMALTOKENPOSE_BASE = "animaltokenpose_base"
+    RTMPOSE_M = "rtmpose_m"
+    RTMPOSE_S = "rtmpose_s"
+    RTMPOSE_X = "rtmpose_x"
+    TOP_DOWN_CSPNEXT_M = "top_down_cspnext_m"
+    TOP_DOWN_CSPNEXT_S = "top_down_cspnext_s"
+    TOP_DOWN_CSPNEXT_X = "top_down_cspnext_x"
+    TOP_DOWN_HRNET_W18 = "top_down_hrnet_w18"
+    TOP_DOWN_HRNET_W32 = "top_down_hrnet_w32"
+    TOP_DOWN_HRNET_W48 = "top_down_hrnet_w48"
+    TOP_DOWN_RESNET_101 = "top_down_resnet_101"
+    TOP_DOWN_RESNET_50 = "top_down_resnet_50"
+
+    @property
+    def is_detector(self) -> bool:
+        return self.value in DETECTOR_NET_TYPES
+
+    @property
+    def is_top_down(self) -> bool:
+        return self.value in TOP_DOWN_NET_TYPES
+
+
+DETECTOR_NET_TYPES = {
+    NetType.FASTERRCNN_MOBILENET_V3_LARGE_FPN.value,
+    NetType.FASTERRCNN_RESNET50_FPN_V2.value,
+    NetType.SSDLITE.value,
+}
+
+TOP_DOWN_NET_TYPES = {
+    NetType.ANIMALTOKENPOSE_BASE.value,
+    NetType.RTMPOSE_M.value,
+    NetType.RTMPOSE_S.value,
+    NetType.RTMPOSE_X.value,
+    NetType.TOP_DOWN_CSPNEXT_M.value,
+    NetType.TOP_DOWN_CSPNEXT_S.value,
+    NetType.TOP_DOWN_CSPNEXT_X.value,
+    NetType.TOP_DOWN_HRNET_W18.value,
+    NetType.TOP_DOWN_HRNET_W32.value,
+    NetType.TOP_DOWN_HRNET_W48.value,
+    NetType.TOP_DOWN_RESNET_101.value,
+    NetType.TOP_DOWN_RESNET_50.value,
+}
 
 
 def _numpy_to_jsonable(obj: Any) -> Any:
