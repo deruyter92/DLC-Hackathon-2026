@@ -14,9 +14,13 @@ class NetType(str, Enum):
 
     # Top-down net types (DeepLabCut cy/h-detectors)
     ANIMALTOKENPOSE_BASE = "animaltokenpose_base"
+    TOP_DOWN_ANIMALTOKENPOSE_BASE = "top_down_animaltokenpose_base"
     RTMPOSE_M = "rtmpose_m"
+    TOP_DOWN_RTMPOSE_M = "top_down_rtmpose_m"
     RTMPOSE_S = "rtmpose_s"
+    TOP_DOWN_RTMPOSE_S = "top_down_rtmpose_s"
     RTMPOSE_X = "rtmpose_x"
+    TOP_DOWN_RTMPOSE_X = "top_down_rtmpose_x"
     TOP_DOWN_CSPNEXT_M = "top_down_cspnext_m"
     TOP_DOWN_CSPNEXT_S = "top_down_cspnext_s"
     TOP_DOWN_CSPNEXT_X = "top_down_cspnext_x"
@@ -43,9 +47,13 @@ DETECTOR_NET_TYPES = {
 
 TOP_DOWN_NET_TYPES = {
     NetType.ANIMALTOKENPOSE_BASE.value,
+    NetType.TOP_DOWN_ANIMALTOKENPOSE_BASE.value,
     NetType.RTMPOSE_M.value,
+    NetType.TOP_DOWN_RTMPOSE_M.value,
     NetType.RTMPOSE_S.value,
+    NetType.TOP_DOWN_RTMPOSE_S.value,
     NetType.RTMPOSE_X.value,
+    NetType.TOP_DOWN_RTMPOSE_X.value,
     NetType.TOP_DOWN_CSPNEXT_M.value,
     NetType.TOP_DOWN_CSPNEXT_S.value,
     NetType.TOP_DOWN_CSPNEXT_X.value,
