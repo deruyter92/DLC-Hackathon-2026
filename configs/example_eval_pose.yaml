@@ -9,7 +9,7 @@ model:
   type: pose_estimation
   name: fish-pose-example
   net_type: top_down_rtmpose_m
-  shuffle: 10
+  shuffle: 9
   trainsetindex: 0
 
 eval_settings:

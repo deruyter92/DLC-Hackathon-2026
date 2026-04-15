@@ -10,7 +10,7 @@ model:
   type: detection
   name: fish-detection-example
   net_type: fasterrcnn_mobilenet_v3_large_fpn
-  shuffle: 11
+  shuffle: 8
   trainsetindex: 0
 
 eval_settings:
